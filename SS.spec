@@ -4,7 +4,7 @@ block_cipher = None
 
 
 a = Analysis(['SS.py'],
-             pathex=['D:\\Ä³í³ñ\\__Python test__\\PyGame\\SS\\Backup_5'],
+             pathex=['D:\\Ä³í³ñ\\__Python test__\\PyGame\\SS\\Git'],
              binaries=None,
              datas=[("Font.ttf" , ".\\") , ("bull.png" , ".\\") , ("map.png" , ".\\") , ("soldierBlue.png" , ".\\") , ("soldierRed.png" , ".\\")],
              hiddenimports=[],
