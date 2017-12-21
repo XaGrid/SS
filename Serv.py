@@ -29,7 +29,7 @@ class Bullet(pygame.sprite.Sprite):
 			return False
 		
 class PlayerClass(pygame.sprite.Sprite):
-	def __init__(self , addr , mask):
+	def __init__(self , addr , img):
 		pygame.sprite.Sprite.__init__(self)
 		self.Address = addr
 		self.Health = 30
@@ -37,20 +37,26 @@ class PlayerClass(pygame.sprite.Sprite):
 		self.Coords = [32 , 32]
 		self.Angle = 0
 		self.State = "Alive"
-		self.mask = mask
-		self.size = mask.get_size()
-		self.rect = pygame.Rect((32 , 32) , self.size)
+		self.Image = img
+		self.size = img.get_size()
+		self.rect = img.get_rect()
+		self.UpdateMask()
 		
 	def SetXY(self , x , y):
 		self.rect.top = y - self.size[1] / 2
 		self.rect.left = x - self.size[0] / 2
+		
+	def UpdateMask(self):
+		TempSurf = pygame.transform.rotate(self.Image , -self.Angle)
+		Offset = (TempSurf.get_size()[0] - self.Image.get_size()[0]) / 2
+		TempSurf = TempSurf.subsurface([Offset , Offset , self.size[0]  , self.size[1]])
+		self.mask = pygame.mask.from_surface(TempSurf)
 		
 
 class GameServer:
 	def __init__(self):
 		self.s = socket.socket(socket.AF_INET , socket.SOCK_DGRAM)
 		IP = socket.gethostbyname(socket.gethostname())
-		#IP = "localhost"
 		print(IP)
 		self.s.bind((IP,1732))
 		self.PlayerArray = []
@@ -61,7 +67,7 @@ class GameServer:
 		
 		self.BackSize = pygame.image.load("map.png").get_size()
 		self.BullSize = pygame.image.load("bull.png").get_size()
-		self.PlayerMask = pygame.mask.from_surface(pygame.image.load("soldierBlue.png"))
+		self.PlayerImage = pygame.image.load("soldierBlue.png")
 		self.BulletMask = pygame.mask.from_surface(pygame.image.load("bull.png"))
 		
 		self.StartServer()
@@ -76,6 +82,7 @@ class GameServer:
 				self.s.close()
 		
 			for P in self.PlayerArray:
+				P.UpdateMask()
 				if P.FireReload > 0:
 					P.FireReload -= 1
 			
@@ -177,7 +184,7 @@ class GameServer:
 				print("Connected " , addr)
 				MapSizes.append(data["MapSize"])
 				BulletSizes.append(data["BulletSize"])
-				self.PlayerArray.append(PlayerClass(addr , self.PlayerMask))
+				self.PlayerArray.append(PlayerClass(addr , self.PlayerImage))
 		
 		if MapSizes.count(MapSizes[0]) == len(MapSizes):
 			print("Map sizes OK")
