@@ -154,13 +154,6 @@ class Game:
 	def drawEnemies(self , EnemiesList):
 		for E in EnemiesList:
 			self.Screen.blit(E.image , E.rect)
-				
-	def DetectCollision(self , BulletList):
-		for B in BulletList:
-			collide = pygame.sprite.collide_mask(B , self.Player)
-			if collide != None:
-				if B.player != self.Player.id:
-					self.C.send({"Action" : "Damage" , "BID" : B.id})
 					
 	def CheckBorders(self):
 		if self.Player.RR.collidelist(self.BorderList) in range(len(self.BorderList)):
@@ -215,10 +208,6 @@ class Game:
 									
 			BulletList = self.Bullets.GetB()
 			EnemiesList = self.Enemies.GetE()
-
-			
-			if self.State != "Die":
-				self.DetectCollision(BulletList)
 			
 			self.Screen.blit(self.BG.map , (0 , 0))
 			
