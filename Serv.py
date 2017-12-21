@@ -63,7 +63,7 @@ class GameServer:
 		self.BulletArray = []
 		self.B_ID = 0
 		self.FireReload = 25
-		self.MaxPlayers = 2
+		self.MaxPlayers = 3
 		
 		self.BackSize = pygame.image.load("map.png").get_size()
 		self.BullSize = pygame.image.load("bull.png").get_size()
@@ -95,7 +95,7 @@ class GameServer:
 				elif Bullet.BorderCollision(self.BList):
 					self.BulletArray.remove(Bullet)
 				for P in self.PlayerArray:	
-					if pygame.sprite.collide_mask(Bullet , P) != None and Bullet.byPlayer != self.PlayerArray.index(P):
+					if pygame.sprite.collide_mask(Bullet , P) != None and Bullet.byPlayer != self.PlayerArray.index(P) and P.State == "Alive":
 						P.Health -= 1
 						self.BulletArray.remove(Bullet)
 						if P.Health == 0:

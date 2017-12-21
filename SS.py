@@ -144,7 +144,8 @@ class Game:
 					self.Player.move(x , y)
 					if self.CheckBorders():
 						self.Player.move(-x , -y)
-			self.LastBlink = time.time()				
+					else:
+						self.LastBlink = time.time()				
 		
 	def drawBullets(self , BulletList):
 		for B in BulletList:
