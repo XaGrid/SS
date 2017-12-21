@@ -91,9 +91,11 @@ class Game:
 	def Start(self):
 		self.Font = pygame.font.Font(resource_path("Font.ttf") , 48)
 		self.HFont = pygame.font.Font(resource_path("Font.ttf") , 20)
-		self.LastBlink = 0
+		self.CDFont = pygame.font.Font(resource_path("Font.ttf") , 16)
+		self.LastBlink = time.time()
 		self.Gameover = False
 		self.PHealth = 666
+		self.BlinkCooldown = 1.5
 		self.BG.Begin(self.size)
 		self.Bullets = Bll()
 		self.Enemies = Enn()
@@ -134,7 +136,7 @@ class Game:
 			self.C.send({"Action" : "Move" , "Coords" : self.Player.getXY() , "Angle" : self.Player.Angle})
 			
 	def Blink(self):
-		if time.time() - self.LastBlink > 1.5:
+		if time.time() - self.LastBlink > self.BlinkCooldown:
 			y = round(sin(self.Player.Angle*pi/180) * 100)
 			x = round(cos(self.Player.Angle*pi/180) * 100)
 			if self.Player.xCoord + x - self.Player.size[0] / 2 >= 0 and self.Player.xCoord + x - self.Player.size[0] / 2 <= self.BG.MapSize[0]:
@@ -231,6 +233,11 @@ class Game:
 			if self.Gameover:
 				Text = self.Font.render("GAME OVER" , 1 , (255 , 0 , 0))
 				self.Screen.blit(Text , ((self.size[0] / 2) - 190 , 5))
+			
+			CD = time.time() - self.LastBlink - self.BlinkCooldown
+			if CD > 0: CD = 0
+			BlinkCooldownText = self.CDFont.render("CD:" + str(-round(CD , 2)) , 1 , (0 , 0 , 255))
+			self.Screen.blit(BlinkCooldownText , (self.size[0] - 150 , self.size[1] - 40))
 			
 			pygame.display.update()
 			
