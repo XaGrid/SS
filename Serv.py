@@ -1,28 +1,49 @@
 import json , socket , threading , time , pygame
 from math import  *
 
-class Bullet:
-	def __init__(self , x , y , xDirection , yDirection , player , id , size):
+class Bullet(pygame.sprite.Sprite):
+	def __init__(self , x , y , xDirection , yDirection , player , id , size , mask):
+		pygame.sprite.Sprite.__init__(self)
 		self.Size = size
 		self.xCoord = x
 		self.yCoord = y
 		self.ID = id
 		self.byPlayer = player
-		self.BulletSpeed = 4
+		self.BulletSpeed = 1
+		self.mask = mask
 		self.Angle = degrees(atan2((yDirection - y) , (xDirection - x)))
 		self.ySpeed = sin(self.Angle*pi/180) * self.BulletSpeed
 		self.xSpeed = cos(self.Angle*pi/180) * self.BulletSpeed
+		self.rect = pygame.Rect((self.xCoord - (self.Size[0] / 2) , self.yCoord - (self.Size[1] / 2)) , mask.get_size())
 	
 	def Update(self):
 		self.xCoord += self.xSpeed
 		self.yCoord += self.ySpeed
+		self.rect.top = self.yCoord - (self.Size[1] / 2)
+		self.rect.left = self.xCoord - (self.Size[0] / 2)
 		
 	def BorderCollision(self , BorderList):
-		Rect = pygame.Rect((self.xCoord - (self.Size[0] / 2) , self.yCoord - (self.Size[1] / 2) ) , self.Size)
-		if Rect.collidelist(BorderList) in range(len(BorderList)):
+		if self.rect.collidelist(BorderList) in range(len(BorderList)):
 			return True
 		else:
 			return False
+		
+class PlayerClass(pygame.sprite.Sprite):
+	def __init__(self , addr , mask):
+		pygame.sprite.Sprite.__init__(self)
+		self.Address = addr
+		self.Health = 30
+		self.FireReload = 0
+		self.Coords = [32 , 32]
+		self.Angle = 0
+		self.State = "Alive"
+		self.mask = mask
+		self.size = mask.get_size()
+		self.rect = pygame.Rect((32 , 32) , self.size)
+		
+	def SetXY(self , x , y):
+		self.rect.top = y - self.size[1] / 2
+		self.rect.left = x - self.size[0] / 2
 		
 
 class GameServer:
@@ -36,21 +57,27 @@ class GameServer:
 		self.BulletArray = []
 		self.B_ID = 0
 		self.FireReload = 25
-		self.MaxPlayers = 3
+		self.MaxPlayers = 2
+		
+		self.BackSize = pygame.image.load("map.png").get_size()
+		self.BullSize = pygame.image.load("bull.png").get_size()
+		self.PlayerMask = pygame.mask.from_surface(pygame.image.load("soldierBlue.png"))
+		self.BulletMask = pygame.mask.from_surface(pygame.image.load("bull.png"))
+		
 		self.StartServer()
 		
 	def Main(self):		
 		while self.RUN:
-			if [P["State"] for P in self.PlayerArray].count("Alive") == 1 and not self.Gameover:
+			if [P.State for P in self.PlayerArray].count("Alive") == 1 and not self.Gameover:
 				self.Gameover = True
 				
-			if [P["State"] for P in self.PlayerArray].count("Alive") == 0:
+			if [P.State for P in self.PlayerArray].count("Alive") == 0:
 				self.RUN = False
 				self.s.close()
 		
 			for P in self.PlayerArray:
-				if P["FireReload"] > 0:
-					P["FireReload"] -= 1
+				if P.FireReload > 0:
+					P.FireReload -= 1
 			
 			for Bullet in self.BulletArray:
 				Bullet.Update()
@@ -58,46 +85,54 @@ class GameServer:
 					self.BulletArray.remove(Bullet)
 				elif Bullet.yCoord < 0 or Bullet.yCoord > self.MapSize[1]:
 					self.BulletArray.remove(Bullet)
-				elif Bullet.BorderCollision(self.BList):	
+				elif Bullet.BorderCollision(self.BList):
 					self.BulletArray.remove(Bullet)
-			time.sleep(0.005)
+				for P in self.PlayerArray:	
+					if pygame.sprite.collide_mask(Bullet , P) != None and Bullet.byPlayer != self.PlayerArray.index(P):
+						P.Health -= 1
+						self.BulletArray.remove(Bullet)
+						if P.Health == 0:
+							P.State = "Die"
+						
+			time.sleep(0.001)
 		
-	def indexAddress(self , array , a , key):
+	def indexAddress(self , array , a):
 		index = 0
 		for i in array:
-			if i[key] == a:
+			if i.Address == a:
 				return index
 			index += 1	
 		return "Not"		
 		
 	def Info(self , YouIndex):
-		Dict = {"Players" : [] , "Bullets" : [] , "State" : "Alive" , "Gameover" : self.Gameover , "Health" : self.PlayerArray[YouIndex]["Health"]}
+		Dict = {"Players" : [] , "Bullets" : [] , "State" : "Alive" , "Gameover" : self.Gameover , "Health" : self.PlayerArray[YouIndex].Health}
 		for P in self.PlayerArray:
-			if P != self.PlayerArray[YouIndex] and P["Health"] >= 0:
-				Dict["Players"].append({"Coords" : P["Coords"] , "Angle" : P["Angle"] , "State" : P["State"]})
+			if P != self.PlayerArray[YouIndex] and P.Health >= 0:
+				Dict["Players"].append({"Coords" : P.Coords , "Angle" : P.Angle , "State" : P.State})
 		for B in self.BulletArray:
 			Dict["Bullets"].append({"Coords" : (B.xCoord , B.yCoord) , "id" : B.ID , "player" : B.byPlayer})
 		
-		if self.PlayerArray[YouIndex]["State"] == "Die":
+		if self.PlayerArray[YouIndex].State == "Die":
 			Dict["State"] = "Die"
 		Data = json.dumps(Dict).encode()
 		return Data
 		
 	def ReloadInfo(self , From , Info):
-		index = self.indexAddress(self.PlayerArray , From , "Address")
+		index = self.indexAddress(self.PlayerArray , From)
 		data = json.loads(Info.decode())
 		if data["Action"] == "Leave":
-			self.PlayerArray[index]["State"] = "Die"
+			self.PlayerArray[index].State = "Die"
 		if data["Action"] == "GetData":
-			self.s.sendto(self.Info(index) , self.PlayerArray[index]["Address"])
+			self.s.sendto(self.Info(index) , self.PlayerArray[index].Address)
 		if data["Action"] == "Move":
-			self.PlayerArray[index]["Coords"] = data["Coords"]
+			self.PlayerArray[index].Coords = data["Coords"]
+			self.PlayerArray[index].SetXY(data["Coords"][0] , data["Coords"][1])
 		if data["Action"] == "Fire":
-			if self.PlayerArray[index]["FireReload"] <= 0:
-				self.BulletArray.append(Bullet(data["x"] , data["y"] , data["xDir"] , data["yDir"] , index , self.B_ID , self.BulletSize))
+			if self.PlayerArray[index].FireReload <= 0:
+				self.BulletArray.append(Bullet(data["x"] , data["y"] , data["xDir"] , data["yDir"] , index , self.B_ID , self.BulletSize , self.BulletMask))
 				self.B_ID += 1
-				self.PlayerArray[index]["FireReload"] = self.FireReload
-		if data["Action"] == "Damage":
+				self.PlayerArray[index].FireReload = self.FireReload
+		if data["Action"] == "Damage" and 0:
 			i = 0
 			BIndex = None
 			for B in self.BulletArray:
@@ -105,12 +140,12 @@ class GameServer:
 					BIndex = i
 				i += 1
 			if BIndex != None:
-				self.PlayerArray[index]["Health"] -= 1
+				self.PlayerArray[index].Health -= 1
 				self.BulletArray.remove(self.BulletArray[BIndex])
-				if self.PlayerArray[index]["Health"] == 0:
-					self.PlayerArray[index]["State"] = "Die"
+				if self.PlayerArray[index].Health == 0:
+					self.PlayerArray[index].State = "Die"
 		try:
-			self.PlayerArray[index]["Angle"] = data["Angle"]
+			self.PlayerArray[index].Angle = data["Angle"]
 		except:
 			pass
 			
@@ -121,9 +156,9 @@ class GameServer:
 		except Exception as E:
 			print(E)
 		
-		if self.indexAddress(self.PlayerArray , self.addr , "Address") != "Not" and self.RUN:
+		if self.indexAddress(self.PlayerArray , self.addr) != "Not" and self.RUN:
 			self.ReloadInfo(self.addr , self.data)
-			
+					
 	def StartServer(self):
 		print("Starting server")
 		self.Gameover = False
@@ -134,7 +169,7 @@ class GameServer:
 			data , addr = self.s.recvfrom(32768)
 			in_list = False
 			for P in self.PlayerArray:
-				if P["Address"] == addr:
+				if P.Address == addr:
 					in_list = True
 					break
 			data = json.loads(data.decode())
@@ -142,7 +177,7 @@ class GameServer:
 				print("Connected " , addr)
 				MapSizes.append(data["MapSize"])
 				BulletSizes.append(data["BulletSize"])
-				self.PlayerArray.append({"Address" : addr})
+				self.PlayerArray.append(PlayerClass(addr , self.PlayerMask))
 		
 		if MapSizes.count(MapSizes[0]) == len(MapSizes):
 			print("Map sizes OK")
@@ -169,15 +204,8 @@ class GameServer:
 		
 		playerIndex = 0
 		for P in self.PlayerArray:
-			self.s.sendto(json.dumps({"Action" : "Go" , "Player" : self.PlayerArray.index(P) , "BList" : self.BList , "PPos" : self.PPosList[playerIndex]}).encode() , P["Address"])
+			self.s.sendto(json.dumps({"Action" : "Go" , "Player" : self.PlayerArray.index(P) , "BList" : self.BList , "PPos" : self.PPosList[playerIndex]}).encode() , P.Address)
 			playerIndex += 1
-		
-		for P in self.PlayerArray:
-			P["Health"] = 3
-			P["FireReload"] = 0
-			P["Coords"] = [32 , 32]
-			P["Angle"] = 0
-			P["State"] = "Alive"
 
 		self.MainThread = threading.Thread(target = self.Main)
 		self.MainThread.start()
