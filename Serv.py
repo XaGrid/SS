@@ -1,4 +1,4 @@
-import json , socket , threading , time , pygame
+import json , socket , threading , time , pygame , random
 from math import  *
 
 class Bullet(pygame.sprite.Sprite):
@@ -61,11 +61,13 @@ class GameServer:
 		self.s.bind((IP,1732))
 		self.PlayerArray = []
 		self.BulletArray = []
+		self.MapInfo = {"Normal" : ["Borders.txt" , "map.png"] , "Extended" : ["BordersExtended.txt" , "map_extended.png"]}
+		self.CurrentMap = "Normal"
 		self.B_ID = 0
 		self.FireReload = 25
 		self.MaxPlayers = 2
 		
-		self.BackSize = pygame.image.load("map.png").get_size()
+		self.BackSize = pygame.image.load(self.MapInfo[self.CurrentMap][1]).get_size()
 		self.BullSize = pygame.image.load("bull.png").get_size()
 		self.PlayerImage = pygame.image.load("soldierBlue.png")
 		self.BulletMask = pygame.mask.from_surface(pygame.image.load("bull.png"))
@@ -88,9 +90,9 @@ class GameServer:
 			
 			for Bullet in self.BulletArray:
 				Bullet.Update()
-				if Bullet.xCoord < 0 or Bullet.xCoord > self.MapSize[0]:
+				if Bullet.xCoord < 0 or Bullet.xCoord > self.BackSize[0]:
 					self.BulletArray.remove(Bullet)
-				elif Bullet.yCoord < 0 or Bullet.yCoord > self.MapSize[1]:
+				elif Bullet.yCoord < 0 or Bullet.yCoord > self.BackSize[1]:
 					self.BulletArray.remove(Bullet)
 				elif Bullet.BorderCollision(self.BList):
 					self.BulletArray.remove(Bullet)
@@ -136,21 +138,9 @@ class GameServer:
 			self.PlayerArray[index].SetXY(data["Coords"][0] , data["Coords"][1])
 		if data["Action"] == "Fire":
 			if self.PlayerArray[index].FireReload <= 0:
-				self.BulletArray.append(Bullet(data["x"] , data["y"] , data["xDir"] , data["yDir"] , index , self.B_ID , self.BulletSize , self.BulletMask))
+				self.BulletArray.append(Bullet(data["x"] , data["y"] , data["xDir"] , data["yDir"] , index , self.B_ID , self.BullSize , self.BulletMask))
 				self.B_ID += 1
 				self.PlayerArray[index].FireReload = self.FireReload
-		if data["Action"] == "Damage" and 0:
-			i = 0
-			BIndex = None
-			for B in self.BulletArray:
-				if B.ID == data["BID"]:
-					BIndex = i
-				i += 1
-			if BIndex != None:
-				self.PlayerArray[index].Health -= 1
-				self.BulletArray.remove(self.BulletArray[BIndex])
-				if self.PlayerArray[index].Health == 0:
-					self.PlayerArray[index].State = "Die"
 		try:
 			self.PlayerArray[index].Angle = data["Angle"]
 		except:
@@ -170,8 +160,6 @@ class GameServer:
 		print("Starting server")
 		self.Gameover = False
 		self.RUN = True
-		MapSizes = []
-		BulletSizes = []
 		while len(self.PlayerArray) < self.MaxPlayers:
 			data , addr = self.s.recvfrom(32768)
 			in_list = False
@@ -182,19 +170,9 @@ class GameServer:
 			data = json.loads(data.decode())
 			if not in_list and data["Action"] == "Start":
 				print("Connected " , addr)
-				MapSizes.append(data["MapSize"])
-				BulletSizes.append(data["BulletSize"])
 				self.PlayerArray.append(PlayerClass(addr , self.PlayerImage))
 		
-		if MapSizes.count(MapSizes[0]) == len(MapSizes):
-			print("Map sizes OK")
-		self.MapSize = MapSizes[0]
-		
-		if BulletSizes.count(BulletSizes[0]) == len(BulletSizes):
-			print("Bullet sizes OK")
-		self.BulletSize = BulletSizes[0]
-		
-		DataFile = open("Borders.txt" , "r")
+		DataFile = open(self.MapInfo[self.CurrentMap][0] , "r")
 		DtFromFile = DataFile.read()
 		DataFile.close()
 		
@@ -211,7 +189,9 @@ class GameServer:
 		
 		playerIndex = 0
 		for P in self.PlayerArray:
-			self.s.sendto(json.dumps({"Action" : "Go" , "Player" : self.PlayerArray.index(P) , "BList" : self.BList , "PPos" : self.PPosList[playerIndex]}).encode() , P.Address)
+			randPos = random.choice(self.PPosList)
+			self.PPosList.remove(randPos)
+			self.s.sendto(json.dumps({"Action" : "Go" , "Player" : self.PlayerArray.index(P) , "BList" : self.BList , "PPos" : randPos , "MapName" : self.MapInfo[self.CurrentMap][1]}).encode() , P.Address)
 			playerIndex += 1
 
 		self.MainThread = threading.Thread(target = self.Main)

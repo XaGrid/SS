@@ -6,8 +6,8 @@ def resource_path(relative):
     return os.path.join(relative)
 
 class BG:
-	def __init__(self):
-		self.image = pygame.image.load(resource_path("map.png"))
+	def __init__(self , MapName):
+		self.image = pygame.image.load(resource_path(MapName))
 		self.MapSize = self.image.get_size()
 		
 	def Begin(self , WndSize):

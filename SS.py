@@ -17,8 +17,8 @@ class Client:
 		self.s = socket.socket(socket.AF_INET , socket.SOCK_DGRAM)
 		self.s.settimeout(0.05)
 		
-	def Start(self , MapSize , BulletSize):
-		StartInfo = json.dumps({"Action" : "Start" , "MapSize" : MapSize , "BulletSize" : BulletSize}).encode()
+	def Start(self):
+		StartInfo = json.dumps({"Action" : "Start"}).encode()
 		
 		while 1:
 			try:
@@ -31,7 +31,7 @@ class Client:
 		data = json.loads(data.decode())
 		if data["Action"] == "Go":
 			print("OK")
-		return data["Player"] , data["BList"] , data["PPos"]
+		return data["Player"] , data["BList"] , data["PPos"] , data["MapName"]
 		
 	def recv(self):
 		try:
@@ -51,7 +51,8 @@ class Game:
 		self.FullS = False
 		print("Loading")
 		pygame.init()
-		self.BG = BG()
+		PId , BList , PStartPos , MapName = self.C.Start()
+		self.BG = BG(MapName)
 		self.info = pygame.display.Info()
 		self.Clock = pygame.time.Clock()
 		
@@ -70,7 +71,7 @@ class Game:
 		self.State = "Alive"
 		self.PressedKeys = []
 		self.Screen = pygame.display.set_mode(self.size)
-		self.Start()
+		self.Start(PId , BList , PStartPos)
 
 	def Request(self):
 		while self.RUN:
@@ -88,7 +89,7 @@ class Game:
 		print("Game ended !")
 		self.C.s.close()
 		
-	def Start(self):
+	def Start(self , PId , BList , PStartPos):
 		self.Font = pygame.font.Font(resource_path("Font.ttf") , 48)
 		self.HFont = pygame.font.Font(resource_path("Font.ttf") , 20)
 		self.CDFont = pygame.font.Font(resource_path("Font.ttf") , 16)
@@ -99,7 +100,6 @@ class Game:
 		self.BG.Begin(self.size)
 		self.Bullets = Bll()
 		self.Enemies = Enn()
-		PId , BList , PStartPos = self.C.Start(self.BG.MapSize , self.Bullets.BSprite.get_size())
 		self.Player = Player(PStartPos , PId)
 		self.BorderList = [pygame.Rect(B) for B in BList]
 		self.RUN = True
