@@ -76,15 +76,18 @@ class Game:
 	def Request(self):
 		while self.RUN:
 			self.C.send({"Action":"GetData"})
-			data = self.C.recv()
+			while 1:
+				data = self.C.recv()
+				break
 			if data != None:
 				self.Bullets.Update(data["Bullets"] , self.BG.MapRect)
 				self.Enemies.Update(data["Players"] , self.BG.MapRect)
-				if data["State"] == "Die":
+				if data["You"]["State"] == "Die":
 					self.State = "Die"
 				if data["Gameover"]:
 					self.Gameover = True
-				self.PHealth = data["Health"]	
+				self.PHealth = data["You"]["Health"]
+				self.Player.MovePos(data["You"]["Coords"][0] , data["You"]["Coords"][1])
 			time.sleep(0.002)
 		print("Game ended !")
 		self.C.s.close()
@@ -112,28 +115,13 @@ class Game:
 		
 	def PlayerMove(self):
 		if 97 in self.PressedKeys:
-			if self.PCoords[0]  - (self.Player.size[0] / 2) > 0:
-				self.Player.move(-self.PSpeed , 0)
-				if self.CheckBorders():
-					self.Player.move(self.PSpeed , 0)
+			self.C.send({"Action" : "Move" , "Direction" : "Left" , "Angle" : self.Player.Angle})
 		if 100 in self.PressedKeys:
-			if self.PCoords[0]  + (self.Player.size[0] / 2) < self.BG.MapSize[0]:
-				self.Player.move(self.PSpeed , 0)
-				if self.CheckBorders():
-					self.Player.move(-self.PSpeed , 0)
+			self.C.send({"Action" : "Move" , "Direction" : "Right" , "Angle" : self.Player.Angle})
 		if 115 in self.PressedKeys:
-			if self.PCoords[1]  + (self.Player.size[1] / 2) < self.BG.MapSize[1]:
-				self.Player.move(0 , self.PSpeed)
-				if self.CheckBorders():
-					self.Player.move(0 , -self.PSpeed)
+			self.C.send({"Action" : "Move" , "Direction" : "Down" , "Angle" : self.Player.Angle})
 		if 119 in self.PressedKeys:
-			if self.PCoords[1]  - (self.Player.size[1] / 2) > 0:
-				self.Player.move(0 , -self.PSpeed)
-				if self.CheckBorders():
-					self.Player.move(0 , self.PSpeed)
-			
-		if len(self.PressedKeys) != 0 or True:
-			self.C.send({"Action" : "Move" , "Coords" : self.Player.getXY() , "Angle" : self.Player.Angle})
+			self.C.send({"Action" : "Move" , "Direction" : "Up" , "Angle" : self.Player.Angle})
 			
 	def Blink(self):
 		if time.time() - self.LastBlink > self.BlinkCooldown:
@@ -145,7 +133,7 @@ class Game:
 					if self.CheckBorders():
 						self.Player.move(-x , -y)
 					else:
-						self.LastBlink = time.time()				
+						self.LastBlink = time.time()			
 		
 	def drawBullets(self , BulletList):
 		for B in BulletList:
@@ -170,7 +158,7 @@ class Game:
 							self.Fire(event.pos)
 					if event.button == 3:
 						if self.State != "Die":
-							self.Blink()		
+							self.C.send({"Action" : "Blink" , "Angle" : self.Player.Angle})
 				elif event.type == 2:
 					if self.Gameover:
 						if event.key == 114:

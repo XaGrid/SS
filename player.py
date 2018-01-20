@@ -51,6 +51,12 @@ class Player(pygame.sprite.Sprite):
 		self.RR.top = self.RR.top + y
 		self.RR.left = self.RR.left + x
 		
+	def MovePos(self , x , y):
+		self.xCoord = x
+		self.yCoord = y
+		self.RR.top = y
+		self.RR.left = x
+		
 	def Update(self , MousePos):
 		self.Angle = degrees(atan2((MousePos[1] - self.Coords[1]) , (MousePos[0] - self.Coords[0])))
 		self.image = pygame.transform.rotate(self.SourceImage , -self.Angle)
