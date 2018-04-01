@@ -1,15 +1,11 @@
-import pygame , json , socket , threading , time , sys , os
+import pygame , json , socket , threading , time , sys , os , base64
 from player import Player
 from bullets import Bll
 from background import BG
 from enemy import Enn
 from pygame.locals import *
 from math import *
-
-def resource_path(relative):
-    if hasattr(sys, "_MEIPASS"):
-        return os.path.join(sys._MEIPASS, relative)
-    return os.path.join(relative)
+from Utils import *
 
 class Client:
 	def __init__(self , ip):
@@ -17,33 +13,44 @@ class Client:
 		self.s = socket.socket(socket.AF_INET , socket.SOCK_DGRAM)
 		self.s.settimeout(0.05)
 		
-	def Start(self):
-		StartInfo = json.dumps({"Action" : "Start"}).encode()
-		
+	def recv(self , wait = False):
 		while 1:
 			try:
-				self.s.sendto(StartInfo , self.Address)
 				data , addr = self.s.recvfrom(16384)
-				break
-			except:
-				continue
-		
-		data = json.loads(data.decode())
-		if data["Action"] == "Go":
-			print("OK")
-		return data["Player"] , data["BList"] , data["PPos"] , data["MapName"]
-		
-	def recv(self):
-		try:
-			data , addr = self.s.recvfrom(16384)
-			data = json.loads(data.decode())
-			return data
-		except Exception as E:
-			print(E)
+				data = json.loads(data.decode())
+				return data
+			except Exception as E:
+				#print(E)
+				if not wait: break
 			
 	def send(self , dict):
 		data = json.dumps(dict).encode()
 		self.s.sendto(data , self.Address)
+
+	def Start(self):
+		FileToDownload = []
+		
+		self.send({"Action" : "Start"})
+		data = self.recv(wait = True)
+
+		if data["Action"] == "CheckFiles":
+			for file in data["Files"]:
+				if not check_file(file):
+					FileToDownload.append(file)
+			self.send({"MissingFiles" : FileToDownload})
+			data = self.recv(wait = True)
+			while not "End" in data:
+				enc_data = base64.decodestring(data["data"].encode())
+				print(data["FileName"] , " | " , len(enc_data))
+				with open(resource_path(data["FileName"]) , "ab") as f:
+					f.write(enc_data)
+				data = self.recv(wait = True)
+
+		data = self.recv(wait = True)
+		
+		if data["Action"] == "Go":
+			print("OK")
+		return data["Player"] , data["BList"] , data["PPos"] , data["MapName"]
 
 class Game:
 	def __init__(self , ip):
@@ -93,6 +100,7 @@ class Game:
 		self.C.s.close()
 		
 	def Start(self , PId , BList , PStartPos):
+		print(os.path.isfile(resource_path("Font.ttf")))
 		self.Font = pygame.font.Font(resource_path("Font.ttf") , 48)
 		self.HFont = pygame.font.Font(resource_path("Font.ttf") , 20)
 		self.CDFont = pygame.font.Font(resource_path("Font.ttf") , 16)

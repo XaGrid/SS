@@ -1,10 +1,6 @@
 import pygame , sys , os
 from pygame.locals import *
-
-def resource_path(relative):
-    if hasattr(sys, "_MEIPASS"):
-        return os.path.join(sys._MEIPASS, relative)
-    return os.path.join(relative)
+from Utils import *
 
 class Bullet(pygame.sprite.Sprite):
 	def __init__(self , x , y , sprite , player , id , mask):	

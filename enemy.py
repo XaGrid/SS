@@ -1,9 +1,5 @@
 import pygame , sys , os
-
-def resource_path(relative):
-    if hasattr(sys, "_MEIPASS"):
-        return os.path.join(sys._MEIPASS, relative)
-    return os.path.join(relative)
+from Utils import *
 
 class Enemy(pygame.sprite.Sprite):
 	def __init__(self , x , y , sprite , Angle):	

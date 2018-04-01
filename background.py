@@ -1,9 +1,5 @@
 import pygame , sys , os
-
-def resource_path(relative):
-    if hasattr(sys, "_MEIPASS"):
-        return os.path.join(sys._MEIPASS, relative)
-    return os.path.join(relative)
+from Utils import *
 
 class BG:
 	def __init__(self , MapName):

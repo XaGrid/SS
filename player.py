@@ -1,10 +1,6 @@
 import pygame , sys , os
 from math import *
-
-def resource_path(relative):
-    if hasattr(sys, "_MEIPASS"):
-        return os.path.join(sys._MEIPASS, relative)
-    return os.path.join(relative)
+from Utils import *
 
 class Player(pygame.sprite.Sprite):
 	def __init__(self , coords , id):

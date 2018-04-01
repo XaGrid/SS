@@ -1,4 +1,4 @@
-import json , socket , threading , time , pygame , random
+import json , socket , threading , time , pygame , random , base64
 from math import  *
 
 class Bullet(pygame.sprite.Sprite):
@@ -78,9 +78,10 @@ class GameServer:
 		self.B_ID = 0
 		self.FireReload = 25
 		self.BlinkReload = 720
-		self.MaxPlayers = 2
+		self.MaxPlayers = 1
 		self.PSpeed = 2
-		
+		self.Files = ["bull.png" , "Font.ttf" , "soldierBlue.png" , "soldierRed.png" , "map.png" , "map_extended.png"]
+
 		self.BackSize = pygame.image.load(self.MapInfo[self.CurrentMap][1]).get_size()
 		self.BullSize = pygame.image.load("bull.png").get_size()
 		self.PlayerImage = pygame.image.load("soldierBlue.png")
@@ -209,7 +210,25 @@ class GameServer:
 			if not in_list and data["Action"] == "Start":
 				print("Connected " , addr)
 				self.PlayerArray.append(PlayerClass(addr , self.PlayerImage))
-		
+
+		for P in self.PlayerArray:
+			self.s.sendto(json.dumps({"Action" : "CheckFiles" , "Files" : self.Files}).encode() , P.Address)
+			while 1:
+				data , addr = self.s.recvfrom(32768)
+				if addr == P.Address:
+					break
+			data = json.loads(data.decode())
+			for file in data["MissingFiles"]:
+				FileD = open(file , "rb") 
+				data = FileD.read(8192)
+				while data:
+					self.s.sendto(json.dumps({"FileName" : file , "data" : base64.encodestring(data).decode()}).encode() , P.Address)
+					data = FileD.read(8192)
+					print(file , " | " , len(data))
+					time.sleep(0.05)
+				FileD.close()
+			self.s.sendto(json.dumps({"End" : False}).encode() , P.Address)	
+			
 		DataFile = open(self.MapInfo[self.CurrentMap][0] , "r")
 		DtFromFile = DataFile.read()
 		DataFile.close()
