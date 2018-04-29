@@ -77,9 +77,9 @@ class GameServer:
 		self.CurrentMap = "Extended"
 		self.B_ID = 0
 		self.FireReload = 25
-		self.BlinkReload = 720
+		self.BlinkReload = 560
 		self.MaxPlayers = 2
-		self.PSpeed = 4
+		self.PSpeed = 3
 		self.Files = ["bull.png" , "Font.ttf" , "soldierBlue.png" , "soldierRed.png" , "map.png" , "map_extended.png"]
 
 		self.BackSize = pygame.image.load(self.MapInfo[self.CurrentMap][1]).get_size()
@@ -94,7 +94,6 @@ class GameServer:
 		try:
 			data , addr = self.s.recvfrom(32768)
 			data = json.loads(data.decode())
-			print(data , " , " , addr)
 			return data , addr 
 		except Exception as E:
 			if E.errno == 10054:
@@ -202,13 +201,14 @@ class GameServer:
 				self.PlayerArray[index].FireReload = self.FireReload
 		
 	def Recving(self):
-		try:
-			data , addr = self.recv()
-		except Exception as E:
-			print(E)
-		
-		if self.indexAddress(self.PlayerArray , addr) != "Not" and self.RUN:
-			self.ReloadInfo(addr , data)
+		while self.RUN:
+			try:
+				data , addr = self.recv()
+			except Exception as E:
+				print(E)
+			
+			if self.indexAddress(self.PlayerArray , addr) != "Not" and self.RUN:
+				self.ReloadInfo(addr , data)
 					
 	def StartServer(self):
 		print("Starting server")

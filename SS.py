@@ -24,7 +24,10 @@ class Client:
 			
 	def send(self , dict):
 		data = json.dumps(dict).encode()
-		self.s.sendto(data , self.Address)
+		try:
+			self.s.sendto(data , self.Address)
+		except:
+			pass
 
 	def Start(self):
 		FileToDownload = []
@@ -43,7 +46,6 @@ class Client:
 			data = self.recv(wait = None)
 			while not "End" in data:
 				enc_data = base64.decodestring(data["data"].encode())
-				print(data["FileName"] , " | " , len(enc_data))
 				with open(resource_path(data["FileName"]) , "ab") as f:
 					f.write(enc_data)
 				data = self.recv(wait = None)
@@ -156,7 +158,6 @@ class Game:
 			self.Screen.blit(B.image , B.rect)
 				
 	def drawEnemies(self , EnemiesList):
-		#print([i.rect for i in EnemiesList])
 		for E in EnemiesList:
 			self.Screen.blit(E.image , E.rect)
 					
@@ -238,7 +239,6 @@ class Game:
 			pygame.display.update()
 			
 			self.Clock.tick(60)
-			#print(self.Clock.get_fps())
 
 ip = input("Enter IP: ")
 			
