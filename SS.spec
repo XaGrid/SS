@@ -4,9 +4,9 @@ block_cipher = None
 
 
 a = Analysis(['SS.py'],
-             pathex=['D:\\Ä³í³ñ\\__Python test__\\PyGame\\SS\\Git'],
-             binaries=None,
-             datas=[("Font.ttf" , ".\\") , ("bull.png" , ".\\") , ("map.png" , ".\\") , ("soldierBlue.png" , ".\\") , ("soldierRed.png" , ".\\") , ("map_extended.png" , ".\\")],
+             pathex=['E:\\D\\Old\\__Python test__\\PyGame\\SS\\Git'],
+             binaries=[],
+             datas=[],
              hiddenimports=[],
              hookspath=[],
              runtime_hooks=[],

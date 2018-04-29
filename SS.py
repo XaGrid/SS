@@ -13,15 +13,14 @@ class Client:
 		self.s = socket.socket(socket.AF_INET , socket.SOCK_DGRAM)
 		self.s.settimeout(0.05)
 		
-	def recv(self , wait = False):
-		while 1:
-			try:
-				data , addr = self.s.recvfrom(16384)
-				data = json.loads(data.decode())
-				return data
-			except Exception as E:
-				#print(E)
-				if not wait: break
+	def recv(self , wait = 0):
+		self.s.settimeout(wait)
+		try:
+			data , addr = self.s.recvfrom(16384)
+			data = json.loads(data.decode())
+			return data
+		except:
+			pass
 			
 	def send(self , dict):
 		data = json.dumps(dict).encode()
@@ -29,24 +28,27 @@ class Client:
 
 	def Start(self):
 		FileToDownload = []
+		data = None
 		
-		self.send({"Action" : "Start"})
-		data = self.recv(wait = True)
+		while not data:
+			self.send({"Action" : "Start"})
+			data = self.recv(wait = 0.1)
+
 
 		if data["Action"] == "CheckFiles":
 			for file in data["Files"]:
 				if not check_file(file):
 					FileToDownload.append(file)
 			self.send({"MissingFiles" : FileToDownload})
-			data = self.recv(wait = True)
+			data = self.recv(wait = None)
 			while not "End" in data:
 				enc_data = base64.decodestring(data["data"].encode())
 				print(data["FileName"] , " | " , len(enc_data))
 				with open(resource_path(data["FileName"]) , "ab") as f:
 					f.write(enc_data)
-				data = self.recv(wait = True)
+				data = self.recv(wait = None)
 
-		data = self.recv(wait = True)
+		data = self.recv(wait = None)
 		
 		if data["Action"] == "Go":
 			print("OK")
@@ -56,6 +58,7 @@ class Game:
 	def __init__(self , ip):
 		self.C = Client(ip)
 		self.FullS = False
+		self.Ping = 0
 		print("Loading")
 		pygame.init()
 		PId , BList , PStartPos , MapName = self.C.Start()
@@ -82,28 +85,32 @@ class Game:
 
 	def Request(self):
 		while self.RUN:
-			self.C.send({"Action":"GetData"})
-			while 1:
-				data = self.C.recv()
-				break
+			LastRequest = time.time()
+			data = self.C.recv(wait = None)
+			self.Ping = 1000 * (time.time() - LastRequest)
+
 			if data != None:
-				self.Bullets.Update(data["Bullets"] , self.BG.MapRect)
-				self.Enemies.Update(data["Players"] , self.BG.MapRect)
+				self.RecvedBullets = data["Bullets"]
+				self.RecvedEnemies = data["Players"]
 				if data["You"]["State"] == "Die":
 					self.State = "Die"
 				if data["Gameover"]:
 					self.Gameover = True
 				self.PHealth = data["You"]["Health"]
 				self.Player.MovePos(data["You"]["Coords"][0] , data["You"]["Coords"][1])
-			time.sleep(0.002)
 		print("Game ended !")
 		self.C.s.close()
-		
+
+	def RequireUpdate(self):
+		while 1:
+			self.C.send({"Action":"GetData"})
+			time.sleep(0.01)
+
 	def Start(self , PId , BList , PStartPos):
 		print(os.path.isfile(resource_path("Font.ttf")))
 		self.Font = pygame.font.Font(resource_path("Font.ttf") , 48)
 		self.HFont = pygame.font.Font(resource_path("Font.ttf") , 20)
-		self.CDFont = pygame.font.Font(resource_path("Font.ttf") , 16)
+		self.PingFont = pygame.font.Font(resource_path("Font.ttf") , 16)
 		self.LastBlink = time.time()
 		self.Gameover = False
 		self.PHealth = 666
@@ -114,8 +121,10 @@ class Game:
 		self.Player = Player(PStartPos , PId)
 		self.BorderList = [pygame.Rect(B) for B in BList]
 		self.RUN = True
-		self.ServerUpdateThread = threading.Thread(target = self.Request)
-		self.ServerUpdateThread.start()
+		self.ServerRecvThread = threading.Thread(target = self.Request)
+		self.ServerRecvThread.start()
+		self.ServerSendReqThread = threading.Thread(target = self.RequireUpdate)
+		self.ServerSendReqThread.start()
 		self.GameLoop()
 		
 	def Fire(self , mousePos):
@@ -132,22 +141,22 @@ class Game:
 			self.C.send({"Action" : "Move" , "Direction" : "Up" , "Angle" : self.Player.Angle})
 			
 	def Blink(self):
-		if time.time() - self.LastBlink > self.BlinkCooldown:
-			y = round(sin(self.Player.Angle*pi/180) * 100)
-			x = round(cos(self.Player.Angle*pi/180) * 100)
-			if self.Player.xCoord + x - self.Player.size[0] / 2 >= 0 and self.Player.xCoord + x - self.Player.size[0] / 2 <= self.BG.MapSize[0]:
-				if self.Player.yCoord + y - self.Player.size[1] / 2 >= 0 and self.Player.yCoord + y - self.Player.size[1] / 2 <= self.BG.MapSize[0]:
-					self.Player.move(x , y)
-					if self.CheckBorders():
-						self.Player.move(-x , -y)
-					else:
-						self.LastBlink = time.time()			
+		y = round(sin(self.Player.Angle*pi/180) * 100)
+		x = round(cos(self.Player.Angle*pi/180) * 100)
+		if self.Player.xCoord + x - self.Player.size[0] / 2 >= 0 and self.Player.xCoord + x - self.Player.size[0] / 2 <= self.BG.MapSize[0]:
+			if self.Player.yCoord + y - self.Player.size[1] / 2 >= 0 and self.Player.yCoord + y - self.Player.size[1] / 2 <= self.BG.MapSize[0]:
+				self.Player.move(x , y)
+				if self.CheckBorders():
+					self.Player.move(-x , -y)
+				else:
+					self.LastBlink = time.time()			
 		
 	def drawBullets(self , BulletList):
 		for B in BulletList:
 			self.Screen.blit(B.image , B.rect)
 				
 	def drawEnemies(self , EnemiesList):
+		#print([i.rect for i in EnemiesList])
 		for E in EnemiesList:
 			self.Screen.blit(E.image , E.rect)
 					
@@ -194,7 +203,7 @@ class Game:
 				pygame.quit()
 				break
 			
-			self.PCoords = self.Player.getXY()		
+			self.PCoords = self.Player.getXY()
 			
 			if self.State != "Die":
 				self.PlayerMove()
@@ -202,6 +211,9 @@ class Game:
 			self.BG.MapUpdate(self.size , self.Player.image.get_size() , self.PCoords)
 			self.Player.Update(pygame.mouse.get_pos())
 									
+			self.Bullets.Update(self.RecvedBullets , self.BG.MapRect)
+			self.Enemies.Update(self.RecvedEnemies , self.BG.MapRect)
+
 			BulletList = self.Bullets.GetB()
 			EnemiesList = self.Enemies.GetE()
 			
@@ -220,14 +232,12 @@ class Game:
 				Text = self.Font.render("GAME OVER" , 1 , (255 , 0 , 0))
 				self.Screen.blit(Text , ((self.size[0] / 2) - 190 , 5))
 			
-			CD = time.time() - self.LastBlink - self.BlinkCooldown
-			if CD > 0: CD = 0
-			BlinkCooldownText = self.CDFont.render("CD:" + str(-round(CD , 2)) , 1 , (0 , 0 , 255))
-			self.Screen.blit(BlinkCooldownText , (self.size[0] - 150 , self.size[1] - 40))
+			PingText = self.PingFont.render("Ping:" + str(round(self.Ping)) , 1 , (0 , 0 , 255))
+			self.Screen.blit(PingText , (self.size[0] - 190 , self.size[1] - 40))
 			
 			pygame.display.update()
 			
-			self.Clock.tick(80)
+			self.Clock.tick(60)
 			#print(self.Clock.get_fps())
 
 ip = input("Enter IP: ")

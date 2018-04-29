@@ -9,7 +9,7 @@ class Bullet(pygame.sprite.Sprite):
 		self.yCoord = y
 		self.ID = id
 		self.byPlayer = player
-		self.BulletSpeed = 1
+		self.BulletSpeed = 2
 		self.mask = mask
 		self.Angle = degrees(atan2((yDirection - y) , (xDirection - x)))
 		self.ySpeed = sin(self.Angle*pi/180) * self.BulletSpeed
@@ -32,7 +32,7 @@ class PlayerClass(pygame.sprite.Sprite):
 	def __init__(self , addr , img):
 		pygame.sprite.Sprite.__init__(self)
 		self.Address = addr
-		self.Health = 30
+		self.Health = 3
 		self.FireReload = 0
 		self.BlinkReload = 0
 		self.BlinkLong = 100
@@ -78,8 +78,8 @@ class GameServer:
 		self.B_ID = 0
 		self.FireReload = 25
 		self.BlinkReload = 720
-		self.MaxPlayers = 1
-		self.PSpeed = 2
+		self.MaxPlayers = 2
+		self.PSpeed = 4
 		self.Files = ["bull.png" , "Font.ttf" , "soldierBlue.png" , "soldierRed.png" , "map.png" , "map_extended.png"]
 
 		self.BackSize = pygame.image.load(self.MapInfo[self.CurrentMap][1]).get_size()
@@ -88,8 +88,22 @@ class GameServer:
 		self.BulletMask = pygame.mask.from_surface(pygame.image.load("bull.png"))
 		
 		self.StartServer()
-		
-	def Main(self):		
+	
+	def recv(self , wait = None):
+		self.s.settimeout(wait)
+		try:
+			data , addr = self.s.recvfrom(32768)
+			data = json.loads(data.decode())
+			print(data , " , " , addr)
+			return data , addr 
+		except Exception as E:
+			if E.errno == 10054:
+				print("Disconnect")
+			print("When recv: " , E)
+			return self.recv()
+
+	def Main(self):
+		Cycles = 1
 		while self.RUN:
 			if [P.State for P in self.PlayerArray].count("Alive") == 1 and not self.Gameover:
 				self.Gameover = True
@@ -119,8 +133,10 @@ class GameServer:
 						self.BulletArray.remove(Bullet)
 						if P.Health == 0:
 							P.State = "Die"
-						
-			time.sleep(0.001)
+
+			#print(1 / (time.time() - Cycles))
+			Cycles = time.time()
+			time.sleep(0.002)
 		
 	def indexAddress(self , array , a):
 		index = 0
@@ -144,9 +160,8 @@ class GameServer:
 		Data = json.dumps(Dict).encode()
 		return Data
 		
-	def ReloadInfo(self , From , Info):
+	def ReloadInfo(self , From , data):
 		index = self.indexAddress(self.PlayerArray , From)
-		data = json.loads(Info.decode())
 		
 		if data["Action"] == "Leave":
 			self.PlayerArray[index].State = "Die"
@@ -188,25 +203,25 @@ class GameServer:
 		
 	def Recving(self):
 		try:
-			self.data , self.addr = self.s.recvfrom(32768)
+			data , addr = self.recv()
 		except Exception as E:
 			print(E)
 		
-		if self.indexAddress(self.PlayerArray , self.addr) != "Not" and self.RUN:
-			self.ReloadInfo(self.addr , self.data)
+		if self.indexAddress(self.PlayerArray , addr) != "Not" and self.RUN:
+			self.ReloadInfo(addr , data)
 					
 	def StartServer(self):
 		print("Starting server")
 		self.Gameover = False
 		self.RUN = True
 		while len(self.PlayerArray) < self.MaxPlayers:
-			data , addr = self.s.recvfrom(32768)
+			data , addr = self.recv()
 			in_list = False
 			for P in self.PlayerArray:
 				if P.Address == addr:
 					in_list = True
 					break
-			data = json.loads(data.decode())
+
 			if not in_list and data["Action"] == "Start":
 				print("Connected " , addr)
 				self.PlayerArray.append(PlayerClass(addr , self.PlayerImage))
@@ -214,10 +229,11 @@ class GameServer:
 		for P in self.PlayerArray:
 			self.s.sendto(json.dumps({"Action" : "CheckFiles" , "Files" : self.Files}).encode() , P.Address)
 			while 1:
-				data , addr = self.s.recvfrom(32768)
-				if addr == P.Address:
+				data , addr = self.recv()
+				print(data)
+				if addr == P.Address and "MissingFiles" in data:
 					break
-			data = json.loads(data.decode())
+
 			for file in data["MissingFiles"]:
 				FileD = open(file , "rb") 
 				data = FileD.read(8192)
