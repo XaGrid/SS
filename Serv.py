@@ -9,7 +9,7 @@ class Bullet(pygame.sprite.Sprite):
 		self.yCoord = y
 		self.ID = id
 		self.byPlayer = player
-		self.BulletSpeed = 2
+		self.BulletSpeed = 4
 		self.mask = mask
 		self.Angle = degrees(atan2((yDirection - y) , (xDirection - x)))
 		self.ySpeed = sin(self.Angle*pi/180) * self.BulletSpeed
@@ -35,14 +35,20 @@ class PlayerClass(pygame.sprite.Sprite):
 		self.Health = 3
 		self.FireReload = 0
 		self.BlinkReload = 0
-		self.BlinkLong = 100
+		self.BlinkLong = 120
+		self.BlinkState = True
+		self.Effects = {"Blink" : []}
 		self.Coords = [32 , 32]
 		self.Angle = 0
+		self.Increment = 1
 		self.State = "Alive"
 		self.Image = img
 		self.size = img.get_size()
 		self.rect = img.get_rect()
 		self.UpdateMask()
+
+	def GetCoords(self):
+		return (self.rect.x , self.rect.y)
 		
 	def Blink(self , MapSize , BorderList):
 		y = round(sin(self.Angle*pi/180) * self.BlinkLong)
@@ -74,13 +80,14 @@ class GameServer:
 		self.PlayerArray = []
 		self.BulletArray = []
 		self.MapInfo = {"Normal" : ["Borders.txt" , "map.png"] , "Extended" : ["BordersExtended.txt" , "map_extended.png"]}
-		self.CurrentMap = "Extended"
+		self.CurrentMap = "Normal"
 		self.B_ID = 0
-		self.FireReload = 25
-		self.BlinkReload = 560
+		self.FireReload = 30
+		self.BlinkReload = 320
+		self.ForceUpdate = False
 		self.MaxPlayers = 2
 		self.PSpeed = 3
-		self.Files = ["bull.png" , "Font.ttf" , "soldierBlue.png" , "soldierRed.png" , "map.png" , "map_extended.png"]
+		self.Files = ["bull.png" , "Font.ttf" , "soldierBlue.png" , "soldierRed.png" , "map.png" , "map_extended.png" , "blinkAnim.png"]
 
 		self.BackSize = pygame.image.load(self.MapInfo[self.CurrentMap][1]).get_size()
 		self.BullSize = pygame.image.load("bull.png").get_size()
@@ -135,7 +142,7 @@ class GameServer:
 
 			#print(1 / (time.time() - Cycles))
 			Cycles = time.time()
-			time.sleep(0.002)
+			time.sleep(0.004)
 		
 	def indexAddress(self , array , a):
 		index = 0
@@ -146,16 +153,35 @@ class GameServer:
 		return "Not"		
 		
 	def Info(self , YouIndex):
-		Dict = {"Players" : [] , "Bullets" : [] , "Gameover" : self.Gameover , "You" : {"Health" : self.PlayerArray[YouIndex].Health , "Coords" : self.PlayerArray[YouIndex].Coords , "State" : self.PlayerArray[YouIndex].State}}
+		Dict = {
+			"Players" : [] ,
+			"Bullets" : [] ,
+			"Blink" : self.PlayerArray[YouIndex].Effects["Blink"] ,
+			"Gameover" : self.Gameover ,
+			"You" : {
+				"Health" : self.PlayerArray[YouIndex].Health ,
+				"Coords" : self.PlayerArray[YouIndex].Coords ,
+				"State" : self.PlayerArray[YouIndex].State
+			} ,
+			"Increment" : self.PlayerArray[YouIndex].Increment
+		}
+
+		self.PlayerArray[YouIndex].Effects["Blink"] = []
+		self.PlayerArray[YouIndex].Increment += 1
+
 		for P in self.PlayerArray:
 			if P.Health >= 0:
 				if P != self.PlayerArray[YouIndex]:
-					Dict["Players"].append({"Coords" : P.Coords , "Angle" : P.Angle , "State" : P.State})
+					PlayerData = {"Coords" : P.Coords , "Angle" : P.Angle , "State" : P.State}
+					Dict["Players"].append(PlayerData)
 		for B in self.BulletArray:
 			Dict["Bullets"].append({"Coords" : (B.xCoord , B.yCoord) , "id" : B.ID , "player" : B.byPlayer})
 		
 		if self.PlayerArray[YouIndex].State == "Die":
 			Dict["You"]["State"] = "Die"
+		if self.PlayerArray[YouIndex].BlinkState:
+			Dict["You"]["Blink"] = True
+			
 		Data = json.dumps(Dict).encode()
 		return Data
 		
@@ -191,8 +217,11 @@ class GameServer:
 		
 		if data["Action"] == "Blink":
 			if self.PlayerArray[index].BlinkReload <= 0:
+				Coords = self.PlayerArray[index].GetCoords()
 				if self.PlayerArray[index].Blink(self.BackSize , self.BList):
 					self.PlayerArray[index].BlinkReload = self.BlinkReload
+					for P in self.PlayerArray:
+						P.Effects["Blink"].append(Coords)
 		
 		if data["Action"] == "Fire":
 			if self.PlayerArray[index].FireReload <= 0:
@@ -233,7 +262,8 @@ class GameServer:
 				print(data)
 				if addr == P.Address and "MissingFiles" in data:
 					break
-
+			if self.ForceUpdate:
+				data["MissingFiles"] = self.Files
 			for file in data["MissingFiles"]:
 				FileD = open(file , "rb") 
 				data = FileD.read(8192)
@@ -244,7 +274,8 @@ class GameServer:
 					time.sleep(0.05)
 				FileD.close()
 			self.s.sendto(json.dumps({"End" : False}).encode() , P.Address)	
-			
+		
+		self.ForceUpdate = False
 		DataFile = open(self.MapInfo[self.CurrentMap][0] , "r")
 		DtFromFile = DataFile.read()
 		DataFile.close()

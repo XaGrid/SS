@@ -3,6 +3,7 @@ from player import Player
 from bullets import Bll
 from background import BG
 from enemy import Enn
+from effects import Effects
 from pygame.locals import *
 from math import *
 from Utils import *
@@ -92,6 +93,9 @@ class Game:
 			self.Ping = 1000 * (time.time() - LastRequest)
 
 			if data != None:
+				if data["Increment"] != self.Increment + 1:
+					print("Missed packet: {} | {}".format(data["Increment"] , self.Increment))
+				self.Increment = data["Increment"]
 				self.RecvedBullets = data["Bullets"]
 				self.RecvedEnemies = data["Players"]
 				if data["You"]["State"] == "Die":
@@ -100,6 +104,9 @@ class Game:
 					self.Gameover = True
 				self.PHealth = data["You"]["Health"]
 				self.Player.MovePos(data["You"]["Coords"][0] , data["You"]["Coords"][1])
+				if data["Blink"]:
+					self.Effects.AddBlinkParticle(data["Blink"])
+			
 		print("Game ended !")
 		self.C.s.close()
 
@@ -115,11 +122,15 @@ class Game:
 		self.PingFont = pygame.font.Font(resource_path("Font.ttf") , 16)
 		self.LastBlink = time.time()
 		self.Gameover = False
+		self.Increment = 1
 		self.PHealth = 666
+		self.RecvedBullets = []
+		self.RecvedEnemies = []
 		self.BlinkCooldown = 1.5
 		self.BG.Begin(self.size)
 		self.Bullets = Bll()
 		self.Enemies = Enn()
+		self.Effects = Effects()
 		self.Player = Player(PStartPos , PId)
 		self.BorderList = [pygame.Rect(B) for B in BList]
 		self.RUN = True
@@ -160,6 +171,10 @@ class Game:
 	def drawEnemies(self , EnemiesList):
 		for E in EnemiesList:
 			self.Screen.blit(E.image , E.rect)
+
+	def drawEffects(self , EffectsList):
+		for E in EffectsList:
+			self.Screen.blit(E[0] , E[1])		
 					
 	def CheckBorders(self):
 		if self.Player.RR.collidelist(self.BorderList) in range(len(self.BorderList)):
@@ -215,11 +230,17 @@ class Game:
 			self.Bullets.Update(self.RecvedBullets , self.BG.MapRect)
 			self.Enemies.Update(self.RecvedEnemies , self.BG.MapRect)
 
+			Particles = self.Effects.Update(self.BG.MapRect)
+
 			BulletList = self.Bullets.GetB()
 			EnemiesList = self.Enemies.GetE()
 			
+			#tm = time.time()
+
 			self.Screen.blit(self.BG.map , (0 , 0))
 			
+			self.drawEffects(Particles)
+
 			if self.State != "Die":
 				self.Screen.blit(self.Player.image , self.Player.getCoords(self.BG.MapSize , self.size))
 			
@@ -238,6 +259,8 @@ class Game:
 			
 			pygame.display.update()
 			
+			#print(time.time() - tm)
+
 			self.Clock.tick(60)
 
 ip = input("Enter IP: ")

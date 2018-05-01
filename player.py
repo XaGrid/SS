@@ -1,11 +1,13 @@
 import pygame , sys , os
 from math import *
+from pygame.locals import *
 from Utils import *
 
 class Player(pygame.sprite.Sprite):
 	def __init__(self , coords , id):
 		pygame.sprite.Sprite.__init__(self)
 		self.SourceImage = pygame.image.load(resource_path("soldierRed.png")).convert_alpha()
+		#self.SourceImage = self.Invert(self.SourceImage)
 		self.Angle = 0
 		self.id = id
 		self.image = self.SourceImage
@@ -18,7 +20,13 @@ class Player(pygame.sprite.Sprite):
 		self.xCoord = coords[0]
 		self.yCoord = coords[1]
 		self.Coords = (32 , 32)
-		
+	
+	def Invert(self , img):
+		inv = pygame.Surface(img.get_rect().size, pygame.SRCALPHA)
+		inv.fill((255,255,255,255))
+		inv.blit(img, (0,0), None, BLEND_RGB_SUB)
+		return inv
+
 	def getCoords(self , MapSize , WndSize):
 		if self.xCoord < (WndSize[0] / 2):
 			x = self.xCoord

@@ -1,15 +1,23 @@
 import pygame , sys , os
+from pygame.locals import *
 from Utils import *
 
 class BG:
 	def __init__(self , MapName):
 		self.image = pygame.image.load(resource_path(MapName))
+#		self.image = self.Invert(self.image)
 		self.MapSize = self.image.get_size()
 		
 	def Begin(self , WndSize):
 		self.image = self.image.convert_alpha()
 		self.map = pygame.Surface(WndSize)
 		self.MapRect = pygame.Rect((0 , 0) , WndSize)
+
+	def Invert(self , img):
+		inv = pygame.Surface(img.get_rect().size, pygame.SRCALPHA)
+		inv.fill((255,255,255,255))
+		inv.blit(img, (0,0), None, BLEND_RGB_SUB)
+		return inv	
 		
 	def setSurface(self , WndSize , PSize , PCoords):
 		

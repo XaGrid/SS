@@ -33,6 +33,8 @@ class Enn:
 				BRect = pygame.Rect(E["Coords"] , (self.ESprite.get_size()))
 				if BRect.colliderect(MapRect):
 					TempEnemies.add(Enemy(E["Coords"][0] - MapRect.x , E["Coords"][1] - MapRect.y , self.ESprite , E["Angle"]))
+				if "Blink" in E:
+					print("Enemy blinked")		
 		self.EnemiesForPaint = TempEnemies
 					
 	def GetE(self):
